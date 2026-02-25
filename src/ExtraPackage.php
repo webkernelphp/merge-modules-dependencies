@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the Composer Merge plugin.
  *
@@ -6,6 +7,12 @@
  *
  * This software may be modified and distributed under the terms of the MIT
  * license. See the LICENSE file for details.
+ *
+ * @since 25/06/26
+ *
+ * Modified by El Moumen Yassine to now always merge the `require-dev`
+ * even if Composer is not in devMode, which guarantees that the `composer.lock`
+ * will contain the `packages-dev` when you generate the lock.
  */
 
 namespace Wikimedia\Composer\Merge\V2;
@@ -151,7 +158,7 @@ class ExtraPackage
         if (!$package instanceof CompletePackage) {
             throw new UnexpectedValueException(
                 'Expected instance of CompletePackage, got ' .
-                get_class($package)
+                    get_class($package)
             );
         }
         // @codeCoverageIgnoreEnd
@@ -186,7 +193,7 @@ class ExtraPackage
 
         $this->mergeScripts($root, $state);
 
-        if ($state->isDevMode()) {
+        if ($state->shouldMergeDev()) {
             $this->mergeDevInto($root, $state);
         } else {
             $this->mergeReferences($root);
@@ -366,7 +373,7 @@ class ExtraPackage
             $origin->getConstraint(),
             $merge->getConstraint()
         ], true);
-        $newConstraint->setPrettyString($oldPrettyString.', '.$newPrettyString);
+        $newConstraint->setPrettyString($oldPrettyString . ', ' . $newPrettyString);
 
         return new Link(
             $origin->getSource(),
@@ -461,7 +468,7 @@ class ExtraPackage
             if ($root !== $unwrapped) {
                 $this->logger->warning(
                     'This Composer version does not support ' .
-                    "'{$type}' merging for aliased packages."
+                        "'{$type}' merging for aliased packages."
                 );
             }
             // @codeCoverageIgnoreEnd
@@ -512,13 +519,15 @@ class ExtraPackage
             );
         } else {
             if (!$state->shouldMergeExtraDeep()) {
-                foreach (array_intersect(
-                    array_keys($extra),
-                    array_keys($rootExtra)
-                ) as $key) {
+                foreach (
+                    array_intersect(
+                        array_keys($extra),
+                        array_keys($rootExtra)
+                    ) as $key
+                ) {
                     $this->logger->info(
-                        "Ignoring duplicate <comment>{$key}</comment> in ".
-                        "<comment>{$this->path}</comment> extra config."
+                        "Ignoring duplicate <comment>{$key}</comment> in " .
+                            "<comment>{$this->path}</comment> extra config."
                     );
                 }
             }
@@ -645,7 +654,8 @@ class ExtraPackage
         $method = 'setExtra'
     ) {
         // @codeCoverageIgnoreStart
-        if ($root instanceof RootAliasPackage &&
+        if (
+            $root instanceof RootAliasPackage &&
             !method_exists($root, $method)
         ) {
             // Unwrap and return the aliased RootPackage.
@@ -661,7 +671,7 @@ class ExtraPackage
         $unwrapped = self::unwrapIfNeeded($root, 'setAliases');
         foreach (array('require', 'require-dev') as $linkType) {
             $linkInfo = BasePackage::$supportedLinkTypes[$linkType];
-            $method = 'get'.ucfirst($linkInfo['method']);
+            $method = 'get' . ucfirst($linkInfo['method']);
             $links = [];
             foreach ($unwrapped->$method() as $link) {
                 $links[$link->getTarget()] = $link->getConstraint()->getPrettyString();
@@ -691,8 +701,8 @@ class ExtraPackage
                 ];
             } elseif (strpos($reqVersion, ' as ') !== false) {
                 throw new UnexpectedValueException(
-                    'Invalid alias definition in "'.$reqName.'": "'.$reqVersion.'". '
-                    . 'Aliases should be in the form "exact-version as other-exact-version".'
+                    'Invalid alias definition in "' . $reqName . '": "' . $reqVersion . '". '
+                        . 'Aliases should be in the form "exact-version as other-exact-version".'
                 );
             }
         }
@@ -713,7 +723,7 @@ class ExtraPackage
         $unwrapped = self::unwrapIfNeeded($root, 'setReferences');
         foreach (['require', 'require-dev'] as $linkType) {
             $linkInfo = BasePackage::$supportedLinkTypes[$linkType];
-            $method = 'get'.ucfirst($linkInfo['method']);
+            $method = 'get' . ucfirst($linkInfo['method']);
             $links = [];
             foreach ($unwrapped->$method() as $link) {
                 $links[$link->getTarget()] = $link->getConstraint()->getPrettyString();
@@ -736,7 +746,8 @@ class ExtraPackage
         foreach ($requires as $reqName => $reqVersion) {
             $reqVersion = preg_replace('{^([^,\s@]+) as .+$}', '$1', $reqVersion);
             $stabilityName = VersionParser::parseStability($reqVersion);
-            if ($stabilityName === 'dev' &&
+            if (
+                $stabilityName === 'dev' &&
                 preg_match('{^[^,\s@]+?#([a-f0-9]+)$}', $reqVersion, $match)
             ) {
                 $name = strtolower($reqName);
